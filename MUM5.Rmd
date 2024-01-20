@@ -1,0 +1,274 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(dummies)
+library(tidyverse)
+Wesbrook <- read_csv('http://jolej.linuxpl.info/Wesbrook.csv',col_types ='ffnfnfffffffffffffnnnnnnnnfnnnn')
+summary(Wesbrook)
+
+library(pROC)
+library(dplyr)
+
+#Wydzielam ze zbioru danych zmienna zalezna Wesbrook
+ y <- Wesbrook %>%
+  select(WESBROOK) %>%
+  mutate(WESBROOK = ifelse(WESBROOK == "Y", 1, 0))
+  
+ y_knn <- Wesbrook$WESBROOK
+  
+# Po zainstalowaniu pakietow przechodze do normalizacji danych, ktore zaczynam od wyrzuceniu zmiennych dla ktorych jest bardzo duzo wartosci NA 
+Wesbrook <- Wesbrook %>%
+  select(-GRADYR1, -FACULTY1, -DEPT1, -MAJOR1, -MARITAL, -FRSTYEAR,-INDUPDT,-ID,-EA )
+summary(Wesbrook)
+
+#Dla kolumn gdzie wartosci NA nie jest duzo wartosci te zamieniam na srednia wartosc tej kolumny
+Wesbrook <- Wesbrook %>%
+  mutate_all(~ifelse(is.na(.), mean(., na.rm = TRUE), .))
+
+#Przeprowadzam standaryzacje dzielac wartosci przez wartosc max
+Wesbrook <- Wesbrook %>%
+  mutate_all(~./max(., na.rm = TRUE))
+  
+summary(Wesbrook)
+
+data <- Wesbrook
+cor_matrix <- cor(data)
+
+library(corrplot)
+corrplot(cor_matrix, method="number",number.cex = 0.4)
+
+#Zostawiam wartosci ktore sa skorelowane z kolumna wesbrook
+
+data <- data.frame(Wesbrook$TOTLGIVE, Wesbrook$FACSTAFF,Wesbrook$OWN_PCT, Wesbrook$SD_INC, Wesbrook$ENG_PCT, Wesbrook$DWEL_VAL, Wesbrook$AVE_INC)
+cor_matrix <- cor(data)
+corrplot(cor_matrix , method="number",number.cex = 0.6)
+
+#Wyrzucam dodatkowo wartosci skorelowane ze soba takie jak DWEL_VAL, OWN_PCT,AVE_INC i SD_INC zostawiam AVE_INC
+
+
+data <- data.frame(Wesbrook$TOTLGIVE, Wesbrook$FACSTAFF,  Wesbrook$ENG_PCT, Wesbrook$AVE_INC)
+cor_matrix <- cor(data)
+corrplot(cor_matrix , method="number",number.cex = 0.6)
+
+Wesbrook <- as.data.frame(Wesbrook)
+
+#losuje indexy zbiorow ktore posluza jako zbiory uczace i testowe
+set <- sample(nrow(data), round(nrow(data)*.75), replace = FALSE)
+X_train <- data[set,]
+X_test <- data[-set, ]
+
+y_train <- as.factor(y$WESBROOK[set])
+y_test <- as.factor(y$WESBROOK[-set])
+
+y_knn_train <- as.factor(y_knn[set])
+y_knn_test <- as.factor(y_knn[-set])
+
+library(caret)
+library(MLmetrics)
+
+#Budowa modelu KNN z 5-krotną walidacją krzyżową seed ustawiony na 123 aby mozna bylo porownywac wyniki
+set.seed(123) 
+ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary,classProbs = TRUE)
+
+
+#Inicjalizacja wektora k_val ktory bedzie ustawial wartosc k w algorytmie
+k_val <- seq(1, 40, by = 2) 
+
+#Ustawienie walidacji krzyzowej
+t_control <- trainControl(method = "repeatedcv", number = 5, repeats = 3, summaryFunction = twoClassSummary,classProbs = TRUE)
+
+grid <- expand.grid(k = k_val)
+set.seed(123)
+#Teraz przechodze do budowy kilku modeli ktorych wyniki podsumuje na koncu
+#Tworzenie modelu k najbliższych sąsiadów
+knn_model <-
+  train(
+    x = X_train,
+    y = y_knn_train,
+    method = "knn",
+    trControl = t_control,
+    tuneGrid = grid,
+    metric = "ROC"
+  )
+  
+
+print(knn_model)
+#Z podsumowania modelu mozna wyczytac ze optymalnym parametrem k jest 5 a pole pod krzywa ROC jest rowne 0.85 co jest dobrym wynikiem i mozna stwierdzic, ze model faktycznie znalazl powiazania miedzy tymi danymi. Pole pod krzywa ROC dla losowego modelu wynosi 0.5.  
+#teraz przeprowadzam 
+set.seed(123)
+library(caret)
+
+#Ocena modelu i uzyskanie macierzy pomylek
+predicts <- predict(knn_model, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+#Wyswietlenie wartosci AUC-ROC
+print(paste("AUC-ROC:", round(auc_score, 4)))
+print(conf_matrix)
+
+
+
+#Meroda nawina Bayesa
+
+naive_bayes <- train(
+  x = X_train,
+  y = y_knn_train,
+  method = "naive_bayes",
+  trControl = t_control,
+  metric = "ROC"
+)
+
+
+library(caret)
+
+#Ocena modelu i uzyskanie macierzy pomylek
+predics <- predict(naive_bayes, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+print(paste("AUC-ROC:", round(auc_score, 4)))
+
+print(conf_matrix)
+
+
+
+
+#Drzewo decyzyjne
+
+decision_tree <- train(
+  x = X_train,
+  y = y_knn_train,
+  method = "rpart",
+  trControl = t_control,
+  metric = "ROC"
+)
+
+#Ocena modelu i uzyskanie macierzy pomylek
+predicts <- predict(decision_tree, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+print(paste("AUC-ROC:", round(auc_score, 4)))
+print(conf_matrix)
+
+
+
+#Las losowy
+
+random_forest <- train(
+  x = X_train,
+  y = y_knn_train,
+  method = "rf",
+  trControl = t_control,
+  metric = "ROC"
+)
+
+predicts <- predict(random_forest, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+print(paste("AUC-ROC:", round(auc_score, 4)))
+print(conf_matrix)
+
+
+#XG Boost
+xgboost <- train(
+  x = X_train,
+  y = y_knn_train,
+  method = "xgbTree",
+  trControl = t_control,
+  metric = "ROC",
+  tuneGrid = expand.grid(
+    nrounds = 100,
+    max_depth = 6,
+    eta = 0.3,
+    gamma = 0.01,
+    colsample_bytree = 1,
+    min_child_weight = 1,
+    subsample = 1
+  ),
+
+)
+
+predicts <- predict(xgboost, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+print(paste("AUC-ROC:", round(auc_score, 4)))
+print(conf_matrix)
+
+
+#SVM
+svm <- train(
+  x = X_train,
+  y = y_knn_train,
+  method = "svmRadial",
+  trControl = t_control,
+  metric = "ROC"
+)
+
+predicts <- predict(svm, newdata = X_test, type = "raw")
+conf_matrix <- confusionMatrix(predicts, y_knn_test)
+roc_curve <- roc(as.numeric(y_knn_test), as.numeric(predicts))
+
+
+plot(roc_curve, col = "blue", main = "Krzywa ROC", col.main = "black", lwd = 2, cex = 1.2)
+#Obliczenie pola AUC-ROC
+auc_score <- auc(roc_curve)
+print(paste("AUC-ROC:", round(auc_score, 4)))
+print(conf_matrix)
+
+#Wnioski
+#Porownanie Modeli:
+
+#Model KNN (k-Nearest Neighbors) osiagnal pole pod krzywą ROC (AUC-ROC) na poziomie 0.8063. Parametr k został ustalony na 5 po przeprowadzeniu 5-krotnej walidacji krzyżowej.
+
+#Model naiwnego Bayesa rowniez mial AUC-ROC na poziomie 0.8063, co sugeruje podobna skutecznosc do modelu KNN.
+
+#Drzewo decyzyjne wykazalo bardzo wysoka skutecznosc, uzyskujac AUC-ROC na poziomie 0.9489.
+
+#Las losowy przewyzszył poprzednie modele, uzyskujac AUC-ROC na poziomie 0.9543.
+
+#XG Boost osiagnal AUC-ROC na poziomie 0.9446, co jest rowniez dobrym wynikiem.
+
+#SVM (Support Vector Machine) osiagnal podobne rezultaty do XG Boost, rowniez uzyskujac AUC-ROC na poziomie 0.9446.
+
+#Analiza Wynikow:
+
+#Drzewo decyzyjne i Las losowy wydaja sie byc najbardziej skuteczne w rozwiazaniu problemu klasyfikacji, uzyskujac najwyzsze wartosci AUC-ROC.
+#Wszystkie modele maja wysoka specyficznosc (Specificity) i pozytywne wartosci predykcyjne (Pos Pred Value).
+#Model KNN osiagnal niższa czułość (Sensitivity) w porównaniu do innych modeli, co mowi, ze nie radzi sobie rownie dobrze w identyfikacji pozytywnych przypadkow.
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

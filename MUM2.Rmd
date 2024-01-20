@@ -1,0 +1,126 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library('car')
+
+library('RcmdrMisc')
+
+library('sandwich')
+library('relimp')
+library('corrplot')
+
+library(tidyverse)
+
+day <- read_csv('http://jolej.linuxpl.info/day.csv')
+
+hour <- read_csv('http://jolej.linuxpl.info/hour.csv')
+
+summary(day)
+
+summary(hour)
+#wykres macierzowy
+
+
+suppressWarnings({
+scatterplotMatrix(~season+yr+mnth+holiday+weekday+workingday+weathersit+temp+atemp+hum+windspeed+casual+registered+cnt,
+                  reg.line=lm, smooth=TRUE, spread=FALSE, span=0.5, id.n=0, 
+                  diagonal = 'boxplot', data=day)
+})
+
+#wykres punktowy
+suppressWarnings({
+scatterplot(cnt~weathersit, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+scatterplot(cnt~workingday, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+scatterplot(cnt~temp, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+scatterplot(cnt~hum, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+scatterplot(cnt~windspeed, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+scatterplot(cnt~casual, reg.line=lm, smooth=TRUE, spread=FALSE, id.method='mahal', id.n = 2, boxplots='xy', span=0.5, data=day)
+
+})
+
+data<-data.frame(day$cnt,day$registered,day$casual,day$mnth,day$season,day$temp,day$yr,day$workingday)
+corr_data<-cor(data)
+
+corrplot(corr_data)
+#Day.cnt jest skorelowane z day.registered i day.casual
+
+with(day,lineplot(cnt,registered,casual))
+
+#Model liniowy
+
+#przez wysoką korelację casual i registered w modelu będę korzystał tylko z registered
+model1 <- lm(cnt ~ season+yr+mnth+holiday+workingday+weekday+weathersit+temp+atemp+hum+windspeed+registered, data=day)
+summary(model1)
+Anova(model1)
+
+#Odrzucam zmienne których Pr>0.05
+
+model2 <- lm(cnt ~ season+yr+weekday+weathersit+hum+windspeed+registered+workingday, data=day)
+summary(model2)
+Anova(model2)
+
+#Znowu odrzucam zmienne których Pr>0.05
+
+model3 <- lm(cnt ~ season+yr+registered+workingday, data=day)
+summary(model3)
+Anova(model3)
+
+#Model jest dobrze dobrany, wspołczynnik R^2 wynosi 0,954, a mediana błędu -2,61
+
+
+#Model nieliniowy
+
+
+day2 <- day
+colSums(day2==0)
+
+#nieznacznie zwiększam zmienną hum abym mógł ją zlogarytmować
+
+day$hum <- day$hum+0.01
+
+#logarytmuje zmienne ciągłe
+day$temp <- with(day, log(temp))
+day$atemp <- with(day, log(atemp))
+day$hum <- with(day, log(hum))
+day$windspeed <- with(day, log(windspeed))
+day$casual <- with(day, log(casual))
+day$registered <- with(day, log(registered))
+day$cnt <- with(day, log(cnt))
+
+# Budowa modelu nieliniowego wraz z dzieleniem na dane treningowe i walidacyjne
+
+set.seed(100)  
+index <- sample(1:nrow(day), 0.8 * nrow(day))
+train <- day[index, ]
+val <- day[-index, ]
+
+nlmodel <- lm(cnt ~ season+yr+workingday+registered, data=train)
+summary(nlmodel)
+Anova(nlmodel)
+
+#Widać, że model jest bardzo dokładny na danych uczących, R^2=0,984, największy błąd wynosi 0.27, mediana 0,0003 a Residual standard error: 0.005452 (błąd średni)
+
+pred <- predict(nlmodel, newdata = val)
+predictions <- data.frame(Real = val$cnt, Predicted = pred)
+
+
+predictions
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

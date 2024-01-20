@@ -1,0 +1,181 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+mallcustomers <- read_csv("http://jolej.linuxpl.info/mallcustomers.csv", col_types = "nfnnn")
+
+summary(mallcustomers)
+
+#Przeprowadze segmentacje w opraciu o zmienne Income i SpendingScore.
+
+#Przypisuje je do zmiennej data
+data <- mallcustomers %>%
+  select(Income, SpendingScore)
+  
+#Standaryzuje przychod 
+scaled_data <- data %>%
+  select(Income, SpendingScore) %>%
+  scale()
+
+summary(scaled_data)
+
+# Klasteryzacja za pomoca funkcji kmeans()
+library(stats)
+
+set.seed(123)
+model <- kmeans(scaled_data, centers=4, nstart = 25)
+
+# Liczba obserwacji w kazdym z klastrow
+model$size
+
+# Srodki kazdego z klastrow
+model$centers
+
+# Wizualizacja klasteryzacji za pomoca funkcji fviz_cluster() z pakietu factoextra
+
+library(factoextra)
+
+fviz_cluster(model,
+             data = scaled_data,
+             repel = TRUE,
+             ggtheme = theme_minimal()) + theme(text = element_text(size = 14))
+
+# Generowanie srednich wartosci dla kazdego z wybranych atrybutow
+data %>%
+  mutate(cluster = model$cluster) %>%
+  select(cluster,
+         Income,
+         SpendingScore) %>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+
+# Metoda lokcia
+
+# Funkcja fviz_nbclust() z pakietu factoextra ma trzy argumenty wejsciowe. 
+# Pierwszym jest zbi�r danych (maryland_college_scaled), 
+# drugim metoda klasteryzacji (kmeans), 
+# a ostatnim metoda oceniania (wss). W tej funkcji wartosc wss reprezentuje metode
+# oceniania WCSS
+
+fviz_nbclust(scaled_data, kmeans, method = "wss")
+
+
+# Metoda sredniego zarysu
+
+# Roznica z poprzednim uzyciem funkcji fviz_nbclust() polega na zastosowaniu
+# metody oceniania "silhouette" zamiast "wss"
+fviz_nbclust(scaled_data, kmeans, method = "silhouette")
+
+# Podobnie jak w przypadku metody lokcia, wyniki metody sredniego zarysu 
+# sugeruja, ze k = 3 to optymalna liczby klastrow.
+
+
+# Statystyka odstepu
+
+# Roznica z poprzednim uzyciem funkcji fviz_nbclust() polega na zastosowaniu
+# metody oceniania "gap_stat"
+
+fviz_nbclust(scaled_data, kmeans, method = "gap_stat")
+
+# Wyniki badan sugeruja, ze optymalna liczby klastrow to 6, i tak przyjme
+
+model <- kmeans(scaled_data, centers=6, nstart = 25)
+fviz_cluster(model,
+             data = scaled_data,
+             repel = TRUE,
+             ggtheme = theme_minimal()) + theme(text = element_text(size = 14))
+
+
+#Dodatkowo przeprowadzilem klasteryzacje na podstawie zmiennych income i age
+#Przypisuje je do zmiennej data
+data2 <- mallcustomers %>%
+  select(Income, Age)
+  
+#Standaryzuje przychod 
+scaled_data2 <- data2 %>%
+  select(Income, Age) %>%
+  scale()
+
+summary(scaled_data)
+
+model2 <- kmeans(scaled_data2, centers = 5, nstart = 25)
+fviz_cluster(
+  model2,
+  data = scaled_data2,
+  main = "Wykres pensji i oceny wydatków klientów",
+  repel = TRUE)
+
+
+# Generowanie srednich wartosci dla kazdego z wybranych atrybutow
+data2 %>%
+  mutate(cluster = model2$cluster) %>%
+  select(cluster,
+         Income,
+         Age) %>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+
+# Metoda lokcia
+
+# Funkcja fviz_nbclust() z pakietu factoextra ma trzy argumenty wejsciowe. 
+# Pierwszym jest zbi�r danych (maryland_college_scaled), 
+# drugim metoda klasteryzacji (kmeans), 
+# a ostatnim metoda oceniania (wss). W tej funkcji wartosc wss reprezentuje metode
+# oceniania WCSS
+
+fviz_nbclust(scaled_data2, kmeans, method = "wss")
+
+
+# Metoda sredniego zarysu
+
+# Roznica z poprzednim uzyciem funkcji fviz_nbclust() polega na zastosowaniu
+# metody oceniania "silhouette" zamiast "wss"
+fviz_nbclust(scaled_data2, kmeans, method = "silhouette")
+
+# Podobnie jak w przypadku metody lokcia, wyniki metody sredniego zarysu 
+# sugeruja, ze k = 3 to optymalna liczby klastrow.
+
+
+# Statystyka odstepu
+
+# Roznica z poprzednim uzyciem funkcji fviz_nbclust() polega na zastosowaniu
+# metody oceniania "gap_stat"
+
+fviz_nbclust(scaled_data2, kmeans, method = "gap_stat")
+
+# Wynik sugeruje, ze optymalna liczby klastrow to 3, i tak przyjme
+
+model2 <- kmeans(scaled_data2, centers = 3, nstart = 25)
+fviz_cluster(
+  model2,
+  data = scaled_data2,
+  main = "Wykres pensji i oceny wydatków klientów",
+  repel = TRUE)
+
+
+# Generowanie srednich wartosci dla kazdego z wybranych atrybutow
+data2 %>%
+  mutate(cluster = model2$cluster) %>%
+  select(cluster,
+         Income,
+         Age) %>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+  
+  
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

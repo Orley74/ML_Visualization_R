@@ -1,0 +1,105 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(ipred)
+library(tree)
+library(RSNNS)
+library(caret)
+library(e1071)
+library(rattle)
+library(rpart)
+library(randomForest)
+library(relimp)
+library(RcmdrMisc)
+
+#Wczytuję dane
+#bank_val to dane walidacyjne z pelnego zbioru bank
+bank_test <-read.csv("http://jolej.linuxpl.info/bank.csv", header=TRUE,sep = ";")
+bank <-read.csv("http://jolej.linuxpl.info/bank-full.csv", header=TRUE,sep = ";")
+
+bank <- within(bank, {
+  y <- Recode(y, '"yes"=1; "no"=0', as.factor=TRUE)
+})
+bank_test <- within(bank_test, {
+  y <- Recode(y, '"yes"=1; "no"=0', as.factor=TRUE)
+})
+
+
+# Tree buduje drzewo klasyfikacyje, y - zmienna objaśniana data zmienne #objaśniajace
+
+drzewo1 <-  tree(y~.,data=bank)
+
+
+summary(drzewo1)
+
+#rysuje drzewo za pomoca plot a nastepnie dodaje opisy za pomoca text
+plot(drzewo1)
+text(drzewo1)
+
+#poprzedni model mial drzewa nieograniczoną liczbę liści, teraz przycinam je do 3 liści
+drzewo2<-prune.tree(drzewo1, best=3)
+plot(drzewo2)
+text(drzewo2)
+
+#korzystam ze zbioru testowego i sprawdzam jak model radzi sobie z nowymi zmiennymi
+pred <-predict(drzewo2, newdata=bank_test)
+
+#widac ze wartosci wystepujace w wynikach to 1 i 2 (nie, tak)
+pred <- encodeClassLabels(pred)
+unique(pred)
+
+#zestawienie wartosci predykowanych i rzeczywistych
+confusionMatrix(factor(pred),factor(bank_test$y))
+
+#buduje nowe drzewo za pomoca innego pakietu rpart, cp określa stopień przyciecia drzewa.
+
+rpart <- rpart(y ~. , data=bank, cp=0.0001)
+#wyswietlenie najpierw wykresu wspolczynnika bledu do wielkosci drzewa a nastepnie pokazanie ich w formie tekstowej
+plotcp(rpart)
+
+printcp(rpart)
+
+#wyswietlenie budowy drzewa
+rpart
+
+#sprawdzam dopasowanie modelu do nowych danych 
+pred2 <- predict(rpart, newdata = bank_test, type = "class")
+
+confusionMatrix(factor(pred2),factor(bank_test$y))
+
+
+bag <- bagging(y~., data=bank, nbagg=150)
+pred3<-predict(bag, newdata = bank_test)
+
+
+
+confusionMatrix(factor(pred3),factor(bank_test$y))
+
+#budowa modelu drzew losowych
+forest <- randomForest(y~., data=bank, ntrees=100)
+pred4<-predict(forest, newdata=bank_test)
+
+confusionMatrix(factor(pred4),factor(bank_test$y))
+
+
+m_svm <- svm(y~., data=bank)
+pred5<-predict(m_svm, newdata=bank_test)
+
+confusionMatrix(factor(pred5),factor(bank_test$y))
+
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

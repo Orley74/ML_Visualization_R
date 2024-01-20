@@ -1,0 +1,117 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(arules)
+
+data <- read.transactions("http://jolej.linuxpl.info/groceries.csv", sep = ",")
+  
+
+summary(data)
+# Z trzech pierwszych wierszy dowiadujemy sie, ze zbior danych zawiera
+# 9835 transakcje (wiersze) i 169 unikatowych elementow (kolumn). 
+# Gestosc zbioru danych wynosi 0,02609. Gestosc jest odwrotnoscia rzadkosci, 
+# czyli reprezentuje odsetek elementow,
+# ktore sa brakujacymi wartosciami.
+# Kolejne trzy wiersze danych wyjsciowych to najczesciej kupowane produkty w sklepie
+# wraz z liczba transakcji, w jakich wystepuja.
+
+
+#Przy pomocy funkcji inspect() mozna wyswietlic liste wskazanych transakcji w zbiorze
+#danych.
+inspect(data[1:6], linebreak = FALSE)
+
+#Mleko pojawia sie w 0.255
+itemFrequency(data[ ,"whole milk"])
+
+library(tidyverse)
+
+#Wyswietlenie pierwszych elementów ze zbioru groceries wraz z ich czestoscia wystepowania w zbiorze danych
+ data_frequencies<-
+  tibble(
+    Items = names(itemFrequency(data)),
+    Frequency = itemFrequency(data)
+  )
+head(data_frequencies)
+
+#Wyswietlenie najczesciej wystepujacych produktow w zbiorze danych
+arrange(data_frequencies,desc(Frequency)) %>%
+  slice(1:10)
+  
+
+# Po uwzgledniu zasady antymonotonicznosci wsparcia, widac, ze prog
+# wsparcia dla regul asocjacyjnych bedzie musial byc nie wiekszy niz 0.0940, aby uchwycic
+# reguly zawierajace te 10 elementow.
+
+
+# Ustalenie paramtrow modelu
+
+# Minimalny prog wsparcia
+# Jak czesto wzorzec musi sie pojawiac, aby byl uzyteczny. Przy zalozeniu ze 
+# interesujace sa wzorce pojawiajace sie przynajmniej dwa razy dziennie. Wiadomo, ze dane byly
+# zbierane przez miesiac i mozna w uproszczeniu zalozyc, ze kazdy z nich mial musial pojawic sie         # przynajmniej piec razy dziennie powinien
+# wystepowac w przynajmniej 90 transakcjach w zbiorze danych. Wiadomo, ze zbior
+# danych zawiera 9835 transakcje, dlatego minimalnym wsparciem dla wzorca bedzie
+# 90/9835=0,0091.
+
+# Wyznaczanie progu ufnosci. Przy zalozeniu , ze aby regula
+# zostala dolaczona, poprzednik i nastepnik musza pojawiac sie razem w przynajmniej
+# polowie przypadkow. W zwiazku z tym  prog ufnosci zostal ustawiony na 0,5.
+
+# Aby wylaczyc reguly, ktore maja mniej niz dwa elementy, 
+# minimalna dlugosc reguly zostala ustawiona na 2.
+
+datarules <-
+  apriori(data,
+          parameter = list(
+            support = 0.0091,
+            confidence = 0.5,
+            minlen =  2
+          ))
+
+summary(datarules)
+
+#Wygenerowano 25 regol 1 o dlugosci 2 i 3 o dlugosci 24
+
+inspect(datarules)
+
+
+# Pierwsza regula mowi, ze w  92 procent (ufnosc) transakcji klienci, ktorzy kupili
+# element proszek do pieczenia, kupili rowniez element mleko. Ten wzorzec mozna znalezc w 52% procent
+# czy 91 transakcjach (wsparcie i licznik) w zbiorze danych. Regula mowi rowniez,
+# ze jesli klient kupil proszek do pieczenia, istnieje 2.04 razy (przyrost) wieksze prawdopodobienstwo,
+# ze kupi rowniez element mleko. To bardzo silna regula.
+
+# Posortowane  dziesiec pierwszych regul w oparciu o przyrost, w tym celu zostala uzyta 
+# funkcja sort() dostepna w pakiecie arules.
+datarules %>%
+  sort(by = "lift") %>%
+  head(n = 10) %>%
+  inspect() 
+
+# Wyswietlenie tylko tych regul, które zawieraja element whole milk
+datarules %>%
+  subset(items %in% "whole milk") %>%
+  inspect()
+
+# Wyswietlenie dziesieciu regul zawierajacych artykul whole milk o najwiekszym przyroscie
+datarules %>%
+  subset(items %in% "whole milk") %>%
+  sort(by = "lift") %>%
+  head(n = 10) %>%
+  inspect()
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

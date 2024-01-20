@@ -1,0 +1,72 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(lattice)
+
+#Program 1
+
+xx <- c(9.20, 6.00, 6.00, 11.25, 11.00, 7.25, 9.7, 13.25, 14.00, 8.00)
+
+histogram(~xx, breaks = c(6, 8, 10, 12, 14), type = "count", main = "Histogram",
+          xlab = "Wartości", ylab = "Częstość", col = "lightblue")
+          
+#Program 2   
+
+set.seed(591)
+
+xx1 <- rnorm(20, mean = 3, sd = 3.6)
+xx2 <- rpois(40, lambda = 3.5)
+xx3 <- rchisq(31, df = 5, ncp = 0)
+
+group <- rep(c("Group-1", "Group-2", "Group-3"), c(length(xx1), length(xx2), length(xx3)))
+
+data <- data.frame(value = c(xx1, xx2, xx3), group = group)
+
+bwplot(value ~ group, data = data, main = "Boxplot",
+       xlab = "Grupy", ylab = "Wartości", col = "lightblue", cex.axis = 0.7)
+
+
+#Program z lab3
+
+#W lab 3 zrobilem tylko jeden duży zbiorczy wykres
+
+Eggs<-read.csv("http://jolej.linuxpl.info/Eggs.csv", header=TRUE)
+wykres <- Eggs
+
+rows <- c(1:nrow(wykres))
+eggs <- wykres$Egg.Pr/max(wykres$Egg.Pr)
+cases <- wykres$Cases/max(wykres$Cases)
+easter <- wykres$Easter
+pork <- wykres$Pork.Pr/max(wykres$Pork.Pr)
+wykres$Easter <- ifelse(Eggs$Easter %in% c('Post Easter', 'Pre Easter'), 1, 0)
+
+data <- data.frame(
+  rows = rows,
+  eggs = eggs,
+  cases = cases,
+  easter = easter,
+  pork = pork
+)
+
+xyplot(eggs + cases + pork + easter ~ rows, data = data,
+       type = c("l", "p"), col = c("blue", "red", "green", "black"),
+       lwd = 1.1,
+       xlab = "X", ylab = "Dane",
+       main = "Wykres zależności",
+       auto.key = list(columns = 2, title = "Grupa"),
+       ylim = c(0.4, 1))       
+       
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

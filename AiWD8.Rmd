@@ -1,0 +1,89 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(ggplot2movies)
+library (ggplot2)
+library(RcmdrMisc)
+library(dplyr)
+all_mov <- movies
+
+#usuniecie filmow bez podanego budzetu 
+bud_mov <- na.omit(all_mov)
+#mozna zauwazyc ze tylko 5215 z 58788 filmow ma podany budzet
+summary(all_mov)
+
+ggplot(all_mov, aes(x = as.factor(year), y = rating)) +
+  geom_boxplot() +
+  scale_x_discrete(
+    breaks = seq(1893, 2005, by = 10),
+    labels = seq(1893, 2005, by = 10)
+  ) +
+  labs(title = "Rozklad ocen w poszczegolnych latach",
+       x = "Rok Wydania",
+       y = "Ocena") +
+  theme_bw()
+#na wykresie ocen w poszczegolnych latach mozna zauwazyc, ze mediana ocen utrzymywala sie na w miare rownym poziomie przez caly czas, jedynie w latach 1893-1913 byla znacznie mniejsza a w 1913-1930 wyzsza od mediany w pozosyalych latach
+
+#dziele budzet na 10 przedzialow
+bud_mov$cat_bud <- with(bud_mov, bin.var(budget, bins=10, method='proportions',labels=NULL))
+
+#ustawiam rating na przedzialy (0,1], (1,2]...
+bud_mov <- bud_mov %>%
+mutate(cat_rat = cut(rating, breaks = seq(0, 10, by = 1)))
+
+#sprawdzam srednia wartosc dla kazdego przedzialu budzetu
+summary_data <- bud_mov %>%
+  group_by(cat_bud) %>%
+  summarize(med_rat = median(rating, na.rm = TRUE))
+
+
+#tworze wykres oceny w zaleznosci od budzetu
+ggplot(summary_data, aes(x = cat_bud, y = med_rat)) +
+  geom_point(size = 3) +
+  labs(title = "Mediana ocen filmow w stosunku do ich budzetu",
+       x = "Przedzial budzetu",
+       y = "Mediana ocen") +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+#co ciekawe na wykresie widac ze nie ma zasady im wiekszy budzet, tym lepsza ocena, warto tez odnotowac ze najwieksza ocene mialy filmy z budzetem z pierwszej grupy [0,25000)
+
+gatunki <- colSums(all_mov[, c("Action", "Animation", "Comedy", "Drama", "Documentary", "Romance", "Short")])
+
+gatunki_df <- data.frame(gatunki)
+gatunki_df$category <- rownames(gatunki_df)
+
+# Stworzenie wykresu liczby filmow w kazdej kategorii
+ggplot(gatunki_df, aes(x = category, y = gatunki)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  labs(title = "Liczba filmow kazdej kategorii",
+       x = "Kategoria",
+       y = "Liczba filmow") +
+  theme_minimal() +
+  scale_y_continuous(labels = scales::comma_format(scale = 1e-3, suffix = " tys."))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Wykres skłądający się z kilku paneli pokazujacy   
+ggplot(bud_mov, aes(x = factor(year))) +
+  geom_bar() +
+  facet_wrap(~ cat_rat, nrow = 3, scales = "free_y") +
+  labs(title = "Liczba filmow ocenionych w poszczegolnych kategoriach w latach",
+       x = "Rok produkcji",
+       y = "Liczba filmów") +
+  theme_minimal()
+
+  
+  
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

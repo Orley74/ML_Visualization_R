@@ -1,0 +1,84 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(BCA)
+library(relimp)
+library(RcmdrMisc)
+library(sqldf)
+library(gplots)
+bank_test <-read.csv("http://jolej.linuxpl.info/bank.csv", header=TRUE,sep = ";")
+bank <-read.csv("http://jolej.linuxpl.info/bank-full.csv", header=TRUE,sep = ";")
+head(bank)
+summary(bank)
+
+#dziele zbior na treningowy i walidacyjny, poprzez dodanie zmiennej sample, ktora definiuje przynaleznosc do okreslonego zbioru 
+bank$Sample <- create.samples(bank, est = 0.7, val = 0.3)
+
+#normalizuje zmienna y, mowiaca o posiadaniu lokaty zmieniam na wartosc ze zbioru {0,1}
+bank <- within(bank, {
+  y <- Recode(y, '"yes"=1; "no"=0', as.factor=FALSE)
+})
+
+head(bank)
+
+#tworze kategorie wiekowe 
+bank$age <- with(bank, bin.var(age, bins=5, method='proportions',labels=NULL))
+
+#najczesciej lokaty moga posiadac osoby majace dobra prace i wyksztalcenie, co zaraz sprawdze 
+
+with(bank, plotMeans(y, job, error.bars="none"))
+
+#najwieksza grupa osob majacych lokacje sa studenci
+#wysietlam do tego wiek osob ktore maja lokaty
+
+with(bank, plotMeans(y, age, error.bars="none"))
+
+#wyraznie widac, ze najwiecej lokat maja osoby w wieku 18-32 i 51-95
+#warto tez sprawdzic ile pieniedzy posiadaja osoby z lokatami
+bank$balance <- with(bank, bin.var(balance, bins=10, method='proportions',labels=NULL))
+
+with(bank, plotMeans(y, balance, error.bars="none"))
+#jak mozna bylo zakladac im wiecej pieniedzy - tym wieksza szansa ze osoba posiada lokate
+
+#ostatnia zaleznoscia bedzie sprawdzenie zmiennej housing
+with(bank, plotMeans(y, housing, error.bars="none"))
+
+#tworze ogolny model liniowy dla wszystkich zmiennych aby zobaczyc ich istotnosc
+
+ml1<- glm(y ~ age + job + marital + education + default + balance +
+               housing + loan + poutcome + previous + pdays + campaign + duration + month + day + contact, family=binomial(logit), data=bank)
+summary(ml1)
+
+#odzucam zmienne nieistotne statystycznie
+ml2 <- glm(y ~ age + job + marital + education + balance + 
+               housing + loan + poutcome + campaign + duration + month + day +contact, family=binomial(logit), data=bank)
+summary(ml2)
+
+# McFadden R2 dla modelu liniowego
+1 - (ml2$deviance/ml2$null.deviance) 
+
+#uzupelniam model tylko zbiorem uczacym
+ml2 <- glm(y ~ age + job + marital + education + balance + 
+               housing + loan + poutcome + campaign + duration + month + day +contact, family=binomial(logit), data=bank, subset=Sample=="Estimation")
+               
+summary(ml2)
+Anova(ml2)
+
+
+
+
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

@@ -1,0 +1,92 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+
+library(lattice)
+library(latticeExtra)
+library(dplyr)
+
+data(Investment, package="sandwich")
+Investment <- as.data.frame(Investment)
+
+Investment
+#Po wyświetleniu widać, że w kolumnie RealInt występuje wartość NA, zapełniam ją korzystając z mediany tej kolumny
+
+Investment$RealInt <- ifelse(is.na(Investment$RealInt), median(Investment$RealInt, na.rm = TRUE), Investment$RealInt)
+
+#Przeprowadzam standaryzacje kolumn, żeby zobaczyć faktyczne trendy w danych. Najpierw  RealInt, który ma wartości ujemne sprowadzam do samych dodatnich,
+#dodając najmniejszą liczbę występującą w tej kolumnie do pozostałych
+
+
+min_int <- abs(min(Investment$RealInt)) 
+            
+min_int
+Investment$RealInt <- Investment$RealInt + min_int
+
+#Standaryzuje wszystkie kolumny sprowadzając wartości do przedziału <0-1>
+
+Investment2 <- Investment %>%
+  mutate(across(everything(), ~ round(scale(., center = FALSE, scale = max(.)), 2)))
+#across(everything()) znaczy że zmiana dotyczy wszystkich kolun,
+#scale=max(.) skaluje do największej wartości w kolumnie, gdzie . oznacza aktualną kolumnę
+
+
+print(Investment2)
+# Wyświetlanie macierzy korelacji
+correlation_matrix <- cor(Investment2[, c("GNP", "Investment", "Price", "Interest", "RealGNP", "RealInv", "RealInt")])
+
+# Wyświetlanie wartości korelacji
+print(correlation_matrix)
+
+
+#Wykres ten należy czytać tak, że każdy wykres odpowiada wartości factora (tutaj Interest), a dla niego są pokazane #wartości Investment w zależności od Price
+xyplot(Investment ~ GNP | factor(Interest) , data=Investment2, layout=c(5, 2),aspect=1)
+
+xyplot(Investment ~ Price | factor(GNP) , data=Investment2, layout=c(5, 2),aspect=1)
+
+
+#tak jak wyżej wykresy są podzielone w zależności od factora, a Investment zależny jest od Price i Interest
+#Pokazuje wyniki, których wartość Investment jest większa od mediany tego pola
+segplot(Investment ~ Price + Interest | factor(GNP),
+data = subset(Investment2, Investment > median(Investment)),
+level = Investment, col.regions = terrain.colors, xlab="Price + Interest", ylab = "Investment"
+)
+
+#Wykres Investment w zależności od Interest
+xyplot(Investment~ Interest, data = Investment2, panel = panel.xyarea, origin = 0,
+aspect = "xy", cut = list(n = 4, overlap = 0))
+
+#Wykres Investment w zależności od Price
+xyplot(Investment~ Price, data = Investment2, panel = panel.xyarea, origin = 0,
+aspect = "xy", cut = list(n = 4, overlap = 0))
+
+#Wykres Investment w zależności od GNP
+xyplot(Investment~ GNP, data = Investment2, panel = panel.xyarea, origin = 0,
+aspect = "xy", cut = list(n = 4, overlap = 0))
+#Na powyższych 3 wykresach widać, że wartości GNP i Price rosną liniowo z Investments 
+
+
+
+#Dokładne pokazanie zależności pomiędzy tymi danymi
+xyplot(Investment ~ Price | factor(GNP), data=Investment2,
+       layout=c(5, 2), aspect=2,
+       panel=function(x, y) {
+	 panel.lmline(x, y)
+           panel.xyplot(x, y)
+       })
+#Podsumowując wykresy, można stwierdzić, że Investments rośnie wraz ze zmiennymi Price, GNP i Interest       
+       
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

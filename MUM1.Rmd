@@ -1,0 +1,143 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+#1. Zaimportowac zbior danych z odpowiednimi typami zmiennych z uzyciem funkcji read_csv()
+wesbrook <- read_csv("http://jolej.linuxpl.info/Wesbrook.csv")
+
+#2 Dokonac wstepnej analizy zbioru z wykorzystaniem statystyk opisowych
+head(wesbrook)
+
+glimpse(wesbrook)   
+
+summary(wesbrook)
+
+# 3. Dokonac analizy istotnosci zmiennych , utworzyc nowy zbior Wesbrook2 zawierajacy tylko 
+# istotne zmienne.
+# 4. Wykonac wizualna analize danych, w ramach analizy wizualnej rozklad zmiennych numerycznych 
+
+wesbrook %>%
+  group_by(PROV) %>%
+  summarize(avg_SD_INC = mean(SD_INC, na.rm = TRUE)) %>%
+
+ggplot(aes(x = PROV, y = avg_SD_INC, fill = PROV)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Region", y = "Średnia wartość SD_INC", title = "Średnia wartość SD_INC dla każdego regionu") +
+  theme_minimal()
+
+
+#Widać, że największe średnie zarobki mają regiony BC i ON
+
+
+wesbrook %>%
+ggplot( aes(x = PROV, y = TOTLGIVE, fill = PROV)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Region", y = "Datki", title = "Histogram: totalgiv vs. prov")
+
+#na wykresie widać, że zdecydowana większość datków pochodzi z regionu BC
+
+wesbrook$PARENT <- ifelse(wesbrook$PARENT == "Y", 1, 0)
+wesbrook$CHILD <- ifelse(wesbrook$CHILD == "Y", 1, 0)
+wesbrook$SPOUSE <- ifelse(wesbrook$SPOUSE == "Y", 1, 0)
+wesbrook$WESBROOK <- ifelse(wesbrook$WESBROOK == "Y", 1, 0)
+
+czy_rodzina <- ifelse(wesbrook$PARENT == 1 | wesbrook$CHILD == 1 | wesbrook$SPOUSE == 1 | wesbrook$WESBROOK == 1, 1, 0)
+
+wesbrook2 <- data.frame(czy_rodzina)
+
+wesbrook2 %>%
+select(czy_rodzina) %>%
+table() %>%
+prop.table()
+
+#Widać, że osoby z rodziną w UBC stanowią 67% wszystkich osób 
+
+max(wesbrook$TOTLGIVE)
+wesbrook2$TOTLGIVE <- wesbrook$TOTLGIVE/max(wesbrook$TOTLGIVE)
+
+wesbrook2 <- wesbrook2 %>%
+  filter(TOTLGIVE != 1)
+
+ggplot(wesbrook2, aes(x = czy_rodzina, y = TOTLGIVE, fill = factor(czy_rodzina))) +
+  geom_boxplot() +
+  labs(x = "Czy w rodzinie", y = "Datki w stosunku do największego", title = "Zależność między datkami a rodziną na UBC") +
+  theme_minimal()
+
+#Widać, że osoby z rodziną w UBC dają większe datki. Jeden z darczyńców przekazał 4 razy więcej niż pieniędzy niż drugi 
+#darczyńca. Na potrzeby lepszej analizy usunę ten przypadek, jej wartość to 3110115 
+
+
+columns_of_interest <- c("AVE_INC", "DWEL_VAL","SD_INC","TOTLGIVE","HH_2PER","HH_3PER","HH_1PER","HH_45PER","MOV_DWEL","OWN_PCT")
+library(psych)
+pairs.panels(wesbrook[, columns_of_interest], main="Macierz Histogramów")
+
+# Odrzucam wartości skorelowane:
+# AVE_INC, DWEL_VAL, SD_INC i OWN_PCT są skorelowane ze sobą więc zostawiam tylko AVE_INC
+# HH_2PER, HH_3PER, HH_1PER, HH_4PER też są mocno skorelowane więc zostawiam tylko HH_1PER
+
+
+
+wesbrook2 <- wesbrook %>%
+  select(WESBROOK,MARITAL,PROV, HH_1PER)
+wesbrook2$TOTLGIVE <- wesbrook$TOTLGIVE/max(wesbrook$TOTLGIVE)
+wesbrook2$AVE_INC <- wesbrook$AVE_INC
+wesbrook2$czyrodzina <- czy_rodzina
+
+summary(wesbrook2)
+
+# W AVE_INC i HH_1PER sa wartosci NA
+wesbrook2 <- wesbrook2 %>%
+  mutate(AVE_INC = ifelse(
+    is.na(AVE_INC),
+    mean(AVE_INC, na.rm = TRUE),
+    AVE_INC
+  ))
+
+wesbrook2 <- wesbrook2 %>%
+  mutate(HH_1PER = ifelse(
+    is.na(HH_1PER),
+    mean(HH_1PER, na.rm = TRUE),
+    HH_1PER
+  ))
+
+wesbrook2$AVE_INC <- wesbrook2$AVE_INC/max(wesbrook2$AVE_INC)
+
+martial <- table(as.factor(wesbrook2$MARITAL))
+prop <- prop.table(martial)
+Nan <- which(is.na(as.factor(wesbrook2$MARITAL)))
+martial
+prop
+
+
+wesbrook2$MARITAL[Nan] <- sample(names(prop), sum(is.na(wesbrook$MARITAL)), 
+                                      replace = TRUE, prob = prop)
+#Uzupełniam brakujące wartosći na podstawie częstości występowania znaków w kolumnie MARITAL
+summary(wesbrook2)
+
+
+  
+library(caTools)
+set.seed(100)
+split <- sample.split(wesbrook2$WESBROOK, SplitRatio = 0.8)
+
+train_data <- subset(wesbrook2, split == TRUE)
+validation_data <- subset(wesbrook2, split == FALSE)
+# zbior treningowy i walidacyjny
+train_data
+
+validation_data
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

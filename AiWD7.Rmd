@@ -1,0 +1,77 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(dplyr)
+
+library(ggplot2)
+?economics
+data <- economics
+
+#Wyswietlam wykres przyrostu populacji w badanych latach
+ggplot(economics, aes(x = date)) +
+  geom_line(aes(y = pop), color = "black") +
+  labs(title = "Wykres zależności populacji od czasu",
+       x="Czas",
+       y="Liczba ludności")
+       
+#Teraz porównuję oszczędności ludzi w czasie
+ggplot(economics, aes(x = date)) +
+  geom_line(aes(y = psavert), color = "black") +
+  labs(title = "Wykres zależności stopy oszczędności osobistych od czasu",
+       x="czas",
+       y="stopa oszczędnośći osobistych")
+       
+#standaryzacja danych 
+#across(everything()) znaczy że zmiana dotyczy wszystkich kolumn,
+#scale=max(.) skaluje do największej wartości w kolumnie, gdzie . oznacza aktualną kolumnę
+economics2 <-
+  mutate(economics,across(c("pce","pop","psavert","uempmed","unemploy"), ~ round(scale(., center = FALSE, scale = max(.)), 2)))
+
+print(economics2)
+
+#Na tym wykresie widać że, w latach gdzie wydatki były najmniejsze ludzie mieli najwięcej oszczędności do wydaje się dosyć logiczne, bo im więcej pieniedzy wydajemy, tym mniej można odłożyć
+p <- ggplot(economics2, aes(x = factor(psavert), y = pce)) +
+  geom_point() +
+  labs(x = "Oszczędności", y = "Wydatki") +
+  ggtitle("Wykres pudełkowy wydatków w zależności od oszczędności ludzi")+
+    theme(axis.text.x = element_text(angle = 45))
+
+p + geom_boxplot(outlier.colour = "green", outlier.size = 3)
+
+
+#Wykres pokazujący bezrobotnych (kolor czarny) do całkowitej populacji (brązowy) w czasie.
+ggplot(economics2, aes(x = date)) +
+  geom_line(aes(y = unemploy), color = "black") +
+  geom_line(aes(y = pop), color = "brown") +
+  labs(title = "Wykres zależności stopy oszczędności osobistych od czasu",
+       x = "czas",
+       y = "stopa oszczędnośći osobistych") +
+  labs(color = "Legend Title") +
+  scale_color_manual(values = c("black", "brown"), labels = c("unemploy", "pop")) 
+      
+#tworze podzbiór zawierający tylko dane z lat 2010-2014      
+babel_data <- subset(economics2, lubridate::year(date) %in% c(2010,2011,2012, 2013, 2014))
+
+#Wykres bąbelkowy pokazujący 
+ggplot(babel_data, aes(x = unemploy, y = pop, size = pce)) +
+  geom_point(alpha = 0.1) +
+  labs(title = "Zależność między liczbą bezrobotnych, populacją a stopą wydatków konsumpcyjnych",
+       x = "Liczba bezrobotnych",
+       y = "Populacja",
+       size = "Stopa wydatków konsumpcyjnych")       
+       
+       
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
